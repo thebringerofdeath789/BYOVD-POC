@@ -1,98 +1,101 @@
+; File: asmSyscall.asm
+; Author: Gregory King
+; Date: September 7, 2025
+; Description: Direct syscall implementation for BYOVD toolkit
+; Architecture: x64 only
+
 .code
 
+; NTSTATUS DoSyscall(DWORD syscallIndex, PVOID* params, ULONG paramCount)
+; RCX = syscallIndex
+; RDX = params array pointer
+; R8 = paramCount
 DoSyscall PROC
-    ; RCX = syscall index
-    ; RDX = parameters array
-    ; R8 = parameter count
-    
-    ; Save registers
-    push rcx
-    push rdx
-    push r8
-    push r9
+    ; Save registers that might be modified
     push r10
     push r11
+    push r12
+    push r13
     
-    ; Move syscall index to EAX
+    ; Save original parameters
+    mov r12, rdx    ; Save params array pointer
+    mov r13, r8     ; Save parameter count
+    
+    ; Move syscall index to EAX (required for syscall)
     mov eax, ecx
     
-    ; Set up parameters based on count
-    test r8, r8
+    ; Set up syscall parameters in proper registers
+    ; Windows x64 syscall convention:
+    ; RCX, RDX, R8, R9 for first 4 parameters
+    
+    ; Check if we have parameters to set up
+    test r12, r12
+    jz no_params
+    test r13, r13
+    jz no_params
+    
+    ; Load first parameter into RCX
+    mov rcx, qword ptr [r12]
+    cmp r13, 1
+    je do_syscall
+    
+    ; Load second parameter into RDX
+    mov rdx, qword ptr [r12 + 8]
+    cmp r13, 2
+    je do_syscall
+    
+    ; Load third parameter into R8
+    mov r8, qword ptr [r12 + 16]
+    cmp r13, 3
+    je do_syscall
+    
+    ; Load fourth parameter into R9
+    mov r9, qword ptr [r12 + 24]
+    cmp r13, 4
+    je do_syscall
+    
+    ; For more than 4 parameters, push additional ones onto stack
+    ; Stack parameters are pushed in reverse order
+    mov r11, r13
+    sub r11, 4          ; Number of stack parameters
+    
+push_params:
+    test r11, r11
     jz do_syscall
+    dec r11
+    push qword ptr [r12 + 32 + r11 * 8]
+    jmp push_params
     
-    ; Load first 4 parameters into registers
-    mov rcx, qword ptr [rdx]        ; First parameter
-    cmp r8, 1
-    je do_syscall
-    
-    mov rdx, qword ptr [rdx + 8]    ; Second parameter
-    cmp r8, 2
-    je do_syscall
-    
-    mov r8, qword ptr [rdx + 16]    ; Third parameter (note: rdx was overwritten, need to recalculate)
-    ; Fix: need to use original RDX
-    pop r11  ; Get original parameter count
-    pop r10  ; Get original parameters array  
-    pop r9   ; Get original syscall index
-    push r9
-    push r10
-    push r11
-    
-    mov rcx, qword ptr [r10]        ; First parameter
-    cmp r11, 1
-    je do_syscall
-    
-    mov rdx, qword ptr [r10 + 8]    ; Second parameter
-    cmp r11, 2
-    je do_syscall
-    
-    mov r8, qword ptr [r10 + 16]    ; Third parameter
-    cmp r11, 3
-    je do_syscall
-    
-    mov r9, qword ptr [r10 + 24]    ; Fourth parameter
-    
-    ; For more than 4 parameters, we need to push them onto the stack
-    cmp r11, 4
-    jle do_syscall
-    
-    ; Push additional parameters in reverse order
-    mov rax, r11
-    sub rax, 4
-    lea r10, [r10 + 32]  ; Start from 5th parameter
-    
-push_loop:
-    test rax, rax
-    jz do_syscall
-    dec rax
-    push qword ptr [r10 + rax * 8]
-    jmp push_loop
+no_params:
+    ; Zero out registers if no parameters
+    xor rcx, rcx
+    xor rdx, rdx
+    xor r8, r8
+    xor r9, r9
     
 do_syscall:
-    ; Restore syscall index
-    pop r11  ; parameter count
-    pop r10  ; parameters array
-    pop rax  ; syscall index (was in RCX originally)
-    
-    ; Prepare for syscall
+    ; Set up syscall instruction
+    ; R10 = RCX (syscall convention requirement)
     mov r10, rcx
+    
+    ; Execute the syscall
     syscall
     
     ; Clean up stack if we pushed extra parameters
-    cmp r11, 4
+    cmp r13, 4
     jle cleanup
+    mov r11, r13
     sub r11, 4
     lea rsp, [rsp + r11 * 8]
     
 cleanup:
     ; Restore registers
+    pop r13
+    pop r12
     pop r11
     pop r10
-    pop r9
-    pop r8
-    pop rdx
-    pop rcx
     
+    ; Return value is already in RAX
     ret
 DoSyscall ENDP
 

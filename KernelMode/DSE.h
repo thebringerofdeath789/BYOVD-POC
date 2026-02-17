@@ -14,6 +14,7 @@
 #include "Providers/IProvider.h"
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace KernelMode {
     /**
@@ -28,9 +29,9 @@ namespace KernelMode {
     public:
         /**
          * @brief Constructs a DSE manager with a given provider.
-         * @param provider A shared pointer to an active IProvider for kernel memory operations.
+         * @param provider Pointer to the provider interface (must remain valid).
          */
-        explicit DSE(std::shared_ptr<Providers::IProvider> provider);
+        explicit DSE(Providers::IProvider* provider);
 
         /**
          * @brief Disables Driver Signature Enforcement.
@@ -44,6 +45,16 @@ namespace KernelMode {
          */
         bool Restore();
 
+        /**
+         * @brief Gets the discovered address of g_CiOptions.
+         */
+        uintptr_t GetCiOptionsAddress() const { return ciOptionsAddress; }
+
+        /**
+         * @brief robust pattern scanning helper (public for testing/BYOVDManager)
+         */
+        uintptr_t FindCiOptionsWithRobustPattern();
+
     private:
         /**
          * @brief Finds the kernel address of the g_CiOptions variable.
@@ -51,7 +62,10 @@ namespace KernelMode {
          */
         bool FindCiOptions();
 
-        std::shared_ptr<Providers::IProvider> provider;
+        // Robust pattern scanning helpers
+        bool ValidateInstructionBlock(const std::vector<uint8_t>& code, size_t offset);
+
+        Providers::IProvider* provider;
         uintptr_t ciOptionsAddress;
         int originalCiOptions;
     };

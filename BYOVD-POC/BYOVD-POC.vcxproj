@@ -55,6 +55,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -104,26 +105,35 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalModuleDependencies>%(AdditionalModuleDependencies)</AdditionalModuleDependencies>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+  <AdditionalIncludeDirectories>$(ProjectDir)..\KernelMode;$(ProjectDir)..\KernelMode\Providers;$(ProjectDir)..\KernelMode\Resources;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\um;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>ntdll.lib;advapi32.lib;kernel32.lib</ImportLibrary>
-      <AdditionalDependencies>ntdll.lib;advapi32.lib;kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ntdll.lib;advapi32.lib;kernel32.lib;wintrust.lib;crypt32.lib;msdelta.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\KernelMode;$(ProjectDir)..\KernelMode\Providers;$(ProjectDir)..\KernelMode\Resources;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\um;$(WindowsSdkDir)Include\$(WindowsSdkVersion)\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <SpectreMitigation>Spectre</SpectreMitigation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>ntdll.lib;advapi32.lib;kernel32.lib;wintrust.lib;crypt32.lib;msdelta.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -135,50 +145,79 @@
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Assembling %(Filename)%(Extension)</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)asmSyscall.obj</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ml64.exe /c /Fo"$(IntDir)asmSyscall.obj" "%(FullPath)"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Assembling %(Filename)%(Extension)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)asmSyscall.obj</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath)</AdditionalInputs>
     </CustomBuild>
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\KernelMode\Callbacks.cpp" />
-    <ClCompile Include="..\KernelMode\DefenderDisabler.cpp" />
+    <ClCompile Include="..\KernelMode\BYOVDManager.cpp" />
     <ClCompile Include="..\KernelMode\DSE.cpp" />
-    <ClCompile Include="..\KernelMode\ETW.cpp" />
-    <ClCompile Include="..\KernelMode\FileHider.cpp" />
+    <ClCompile Include="..\KernelMode\UACBypass.cpp" />
     <ClCompile Include="..\KernelMode\Main.cpp" />
     <ClCompile Include="..\KernelMode\ManualMapper.cpp" />
     <ClCompile Include="..\KernelMode\PEParser.cpp" />
-    <ClCompile Include="..\KernelMode\Persistence.cpp" />
+    <ClCompile Include="..\KernelMode\SMEPBypass.cpp" />
     <ClCompile Include="..\KernelMode\PocMenu.cpp" />
-    <ClCompile Include="..\KernelMode\Privilege.cpp" />
-    <ClCompile Include="..\KernelMode\Process.cpp" />
     <ClCompile Include="..\KernelMode\Providers\DBUtilProvider.cpp" />
     <ClCompile Include="..\KernelMode\Providers\GdrvProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\IProvider.cpp" />
     <ClCompile Include="..\KernelMode\Providers\RTCoreProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\NeacSafe64Provider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\WinIoProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\IntelNalProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\IntelPmxProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\ProviderManager.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\ProcessHackerProvider.cpp" />
+    <ClCompile Include="..\KernelMode\ServiceManager.cpp" />
+    <ClCompile Include="..\KernelMode\Resources\DriverDataManager.cpp" />
     <ClCompile Include="..\KernelMode\Syscall.cpp" />
-    <ClCompile Include="..\KernelMode\Uninstaller.cpp" />
     <ClCompile Include="..\KernelMode\Utils.cpp" />
+    <ClCompile Include="..\KernelMode\Victim.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\AsrDrvProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\EchoDrvProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\MimidrvProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\ProcessExplorerProvider.cpp" />
+    <ClCompile Include="..\KernelMode\Providers\WinRing0Provider.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\KernelMode\Callbacks.h" />
-    <ClInclude Include="..\KernelMode\DefenderDisabler.h" />
+    <ClInclude Include="..\KernelMode\BYOVDManager.h" />
     <ClInclude Include="..\KernelMode\DSE.h" />
-    <ClInclude Include="..\KernelMode\ETW.h" />
-    <ClInclude Include="..\KernelMode\FileHider.h" />
+    <ClInclude Include="..\KernelMode\UACBypass.h" />
     <ClInclude Include="..\KernelMode\ManualMapper.h" />
     <ClInclude Include="..\KernelMode\PEParser.h" />
-    <ClInclude Include="..\KernelMode\Persistence.h" />
+    <ClInclude Include="..\KernelMode\SMEPBypass.h" />
     <ClInclude Include="..\KernelMode\PocMenu.h" />
-    <ClInclude Include="..\KernelMode\Privilege.h" />
-    <ClInclude Include="..\KernelMode\Process.h" />
+    <ClInclude Include="..\KernelMode\Victim.h" />
     <ClInclude Include="..\KernelMode\Providers\DBUtilProvider.h" />
     <ClInclude Include="..\KernelMode\Providers\GdrvProvider.h" />
     <ClInclude Include="..\KernelMode\Providers\IProvider.h" />
     <ClInclude Include="..\KernelMode\Providers\RTCoreProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\NeacSafe64Provider.h" />
+    <ClInclude Include="..\KernelMode\Providers\WinIoProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\IntelNalProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\ProviderManager.h" />
+    <ClInclude Include="..\KernelMode\Providers\IntelPmxProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\ProcessHackerProvider.h" />
+    <ClInclude Include="..\KernelMode\ServiceManager.h" />
+    <ClInclude Include="..\KernelMode\Resources\resource.h" />
     <ClInclude Include="..\KernelMode\Syscall.h" />
-    <ClInclude Include="..\KernelMode\Uninstaller.h" />
     <ClInclude Include="..\KernelMode\Utils.h" />
+    <ClInclude Include="DriverDataManager.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="..\KernelMode\Providers\AsrDrvProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\EchoDrvProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\MimidrvProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\ProcessExplorerProvider.h" />
+    <ClInclude Include="..\KernelMode\Providers\WinRing0Provider.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="KernelModeCpp.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

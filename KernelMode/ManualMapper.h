@@ -56,5 +56,24 @@ namespace KernelMode {
         void ApplyRelocations(std::vector<char>& imageBuffer, uintptr_t delta);
 
         std::shared_ptr<Providers::IProvider> provider;
+        
+        // Track kernel memory allocations for proper cleanup
+        struct KernelAllocation {
+            uintptr_t address;
+            size_t size;
+        };
+        std::vector<KernelAllocation> allocations;
+        
+    public:
+        /**
+         * @brief Cleanup all allocated kernel memory.
+         * This should be called before destroying the mapper or on error.
+         */
+        void Cleanup();
+        
+        /**
+         * @brief Destructor ensures cleanup.
+         */
+        ~ManualMapper();
     };
 }

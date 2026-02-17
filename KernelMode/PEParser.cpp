@@ -46,7 +46,16 @@ namespace KernelMode {
             return false;
         }
 
-        if (this->fileBuffer.size() < this->dosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS64)) {
+        // Validate e_lfanew
+        if (this->dosHeader->e_lfanew < 0 || 
+            (size_t)this->dosHeader->e_lfanew >= this->fileBuffer.size() || 
+            (this->dosHeader->e_lfanew & 0x3) != 0) { // Check for alignment (4 bytes)
+            std::wcerr << L"[-] Invalid e_lfanew pointer (OOB or misaligned)." << std::endl;
+            return false;
+        }
+
+        // Check for integer overflow in header location calculation
+        if (this->fileBuffer.size() < (size_t)this->dosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS64)) {
             std::wcerr << L"[-] File is too small to contain NT headers." << std::endl;
             return false;
         }
@@ -61,6 +70,35 @@ namespace KernelMode {
             std::wcerr << L"[-] Only 64-bit PE files are supported by this parser." << std::endl;
             return false;
         }
+
+        // --- BUG-001/002 FIX: Strict Section Bounds Checking ---
+        if (this->ntHeaders->FileHeader.NumberOfSections > 96) { // 96 is reasonable max for Windows PE
+            std::wcerr << L"[-] Suspicious number of sections: " << this->ntHeaders->FileHeader.NumberOfSections << std::endl;
+            return false;
+        }
+
+        PIMAGE_SECTION_HEADER sectionHeader = IMAGE_FIRST_SECTION(this->ntHeaders);
+        // Verify section headers fit in file
+        size_t sectionsEnd = (size_t)((PBYTE)sectionHeader - (PBYTE)this->fileBuffer.data()) + 
+                             (this->ntHeaders->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER));
+        
+        if (sectionsEnd > this->fileBuffer.size()) {
+             std::wcerr << L"[-] Section headers extend beyond file bounds." << std::endl;
+             return false;
+        }
+
+        // Verify each section's raw data fits in file
+        for (WORD i = 0; i < this->ntHeaders->FileHeader.NumberOfSections; ++i) {
+            if (sectionHeader[i].PointerToRawData > 0) {
+                 // Check for integer overflow (Pointer + Isze)
+                 if (sectionHeader[i].PointerToRawData + sectionHeader[i].SizeOfRawData < sectionHeader[i].PointerToRawData ||
+                     sectionHeader[i].PointerToRawData + sectionHeader[i].SizeOfRawData > this->fileBuffer.size()) {
+                     std::wcerr << L"[-] Section " << i << L" data is OOB." << std::endl;
+                     return false;
+                 }
+            }
+        }
+        // --------------------------------------------------------
 
         return true;
     }
@@ -105,7 +143,21 @@ namespace KernelMode {
         print_field("Number of RVA and Sizes", this->ntHeaders->OptionalHeader.NumberOfRvaAndSizes);
 
         std::cout << "\n[+] Section Headers\n";
+        // --- BUG-C001 FIX: Validate section table bounds before access ---
         PIMAGE_SECTION_HEADER sectionHeader = IMAGE_FIRST_SECTION(this->ntHeaders);
+        BYTE* sectionTableStart = reinterpret_cast<BYTE*>(sectionHeader);
+        size_t sectionTableSize = this->ntHeaders->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
+        BYTE* sectionTableEnd = sectionTableStart + sectionTableSize;
+        BYTE* fileBufferEnd = reinterpret_cast<BYTE*>(this->fileBuffer.data()) + this->fileBuffer.size();
+        
+        if (sectionTableEnd > fileBufferEnd) {
+            std::cerr << "[-] ERROR: Section table extends beyond file buffer (potential overflow)" << std::endl;
+            std::cerr << "    Section table end: 0x" << std::hex << (uintptr_t)sectionTableEnd << std::endl;
+            std::cerr << "    File buffer end:   0x" << (uintptr_t)fileBufferEnd << std::dec << std::endl;
+            return; // Abort to prevent crash
+        }
+        // -----------------------------------------------------------------
+        
         for (WORD i = 0; i < this->ntHeaders->FileHeader.NumberOfSections; ++i, ++sectionHeader) {
             std::cout << "  [" << i << "] " << sectionHeader->Name << "\n";
             print_field("  - Virtual Size", sectionHeader->Misc.VirtualSize);

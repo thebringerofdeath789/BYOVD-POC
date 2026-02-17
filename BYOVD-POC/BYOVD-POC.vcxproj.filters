@@ -23,70 +23,97 @@
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\KernelMode\Privilege.cpp">
+    <ClCompile Include="..\KernelMode\BYOVDManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\KernelMode\DSE.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\KernelMode\Utils.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\Providers\GdrvProvider.cpp">
-      <Filter>Providers</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\Callbacks.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\KernelMode\Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\PEParser.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\PocMenu.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\Process.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\Providers\RTCoreProvider.cpp">
-      <Filter>Providers</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\Providers\DBUtilProvider.cpp">
-      <Filter>Providers</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\DefenderDisabler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\ETW.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\KernelMode\FileHider.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\KernelMode\ManualMapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\KernelMode\Persistence.cpp">
+    <ClCompile Include="..\KernelMode\PEParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\SMEPBypass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\PocMenu.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\DBUtilProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\GdrvProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\IProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\RTCoreProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\NeacSafe64Provider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\WinIoProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\IntelPmxProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\ProviderManager.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Providers\ProcessHackerProvider.cpp">
+      <Filter>Providers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\ServiceManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\DriverDataManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\KernelMode\Syscall.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\KernelMode\Uninstaller.cpp">
+    <ClCompile Include="..\KernelMode\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\EmbeddedDrivers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\KernelMode\Victim.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\KernelMode\Privilege.h">
+    <ClInclude Include="..\KernelMode\BYOVDManager.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\KernelMode\DSE.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\KernelMode\Utils.h">
+    <ClInclude Include="..\KernelMode\ManualMapper.h">
       <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\PEParser.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\SMEPBypass.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\PocMenu.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\Victim.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\Providers\DBUtilProvider.h">
+      <Filter>Providers</Filter>
     </ClInclude>
     <ClInclude Include="..\KernelMode\Providers\GdrvProvider.h">
       <Filter>Providers</Filter>
@@ -94,43 +121,40 @@
     <ClInclude Include="..\KernelMode\Providers\IProvider.h">
       <Filter>Providers</Filter>
     </ClInclude>
-    <ClInclude Include="..\KernelMode\Callbacks.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\KernelMode\PEParser.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\KernelMode\PocMenu.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\KernelMode\Process.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\KernelMode\Providers\RTCoreProvider.h">
       <Filter>Providers</Filter>
     </ClInclude>
-    <ClInclude Include="..\KernelMode\Providers\DBUtilProvider.h">
+    <ClInclude Include="..\KernelMode\Providers\NeacSafe64Provider.h">
       <Filter>Providers</Filter>
     </ClInclude>
-    <ClInclude Include="..\KernelMode\DefenderDisabler.h">
+    <ClInclude Include="..\KernelMode\Providers\WinIoProvider.h">
+      <Filter>Providers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\Providers\ProviderManager.h">
+      <Filter>Providers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\Providers\IntelPmxProvider.h">
+      <Filter>Providers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\Providers\ProcessHackerProvider.h">
+      <Filter>Providers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\KernelMode\ServiceManager.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\KernelMode\ETW.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\KernelMode\FileHider.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\KernelMode\ManualMapper.h">
-      <Filter>Source Files\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\KernelMode\Persistence.h">
+    <ClInclude Include="..\KernelMode\Resources\resource.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\KernelMode\Syscall.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\KernelMode\Uninstaller.h">
+    <ClInclude Include="..\KernelMode\Utils.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DriverDataManager.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -138,5 +162,13 @@
     <CustomBuild Include="..\KernelMode\asmSyscall.asm">
       <Filter>Source Files</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="KernelModeCpp.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+    <ResourceCompile Include="..\rc KernelMode\Resources\resource.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

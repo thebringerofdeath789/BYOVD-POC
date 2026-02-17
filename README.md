@@ -2,9 +2,10 @@
 
 **Author:** [Gregory King](https://github.com/thebringerofdeath789)  
 **Repository:** [KernelModeCpp](https://github.com/thebringerofdeath789/KernelModeCpp)  
-**Version:** 1.0  
-**Date:** August 14, 2025  
+**Version:** 1.1 (Post-Audit 2026)  
+**Date:** February 17, 2026  
 **License:** Educational/Research Use Only
+**Status:** ✅ Active Development - P0 Critical Fixes Implemented (Jan 2026)
 
 ## 🚨 Disclaimer
 
@@ -13,10 +14,12 @@ This project is developed **strictly for educational and security research purpo
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Documentation](#documentation)
+- [Current Status](#current-status)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Supported Vulnerable Drivers](#supported-vulnerable-drivers)
-- [Installation](#installation)
+- [Installation and Building](#installation-and-building)
 - [Usage](#usage)
 - [Technical Details](#technical-details)
 - [Legal Notice](#legal-notice)
@@ -25,7 +28,30 @@ This project is developed **strictly for educational and security research purpo
 
 ## 🔍 Overview
 
-KernelMode is a comprehensive proof-of-concept toolkit that demonstrates advanced Windows kernel exploitation techniques. It leverages vulnerable signed drivers to establish kernel-level memory read/write primitives, enabling sophisticated attacks typically reserved for kernel-mode operations. The toolkit implements a modular provider-based architecture inspired by the [Kernel Driver Utility (KDU)](https://github.com/hfiref0x/KDU) project by hFiref0x.
+KernelMode is a comprehensive proof-of-concept toolkit that demonstrates advanced Windows kernel exploitation techniques. It leverages vulnerable signed drivers to establish kernel-level memory read/write primitives, enabling sophisticated attacks typically reserved for kernel-mode operations. The toolkit implements a modular provider-based architecture inspired by the [Kernel Driver Utility (KDU)](https://github.com/hfiref0x/KDU) project.
+
+This project has recently undergone a comprehensive code audit (Jan 2026), addressing critical lifecycle issues, memory leaks, and provider implementation flaws.
+
+## 📚 Documentation
+
+Detailed documentation is available in the `docs/` folder:
+
+*   **[Audit Summary](docs/AUDIT_FINAL_SUMMARY.md)**: Final report of the Jan 2026 code audit.
+*   **[Lifecycle Fixes](docs/LIFECYCLE_FIXES_IMPLEMENTED.md)**: Details on implemented critical fixes.
+*   **[Technical Workflows](docs/technical_workflow.md)**: Detailed step-by-step explanation of the exploit chain, memory primitives, and DSE bypass logic.
+*   **[Build Instructions](docs/BUILD_INSTRUCTIONS.md)**: How to compile the project.
+*   **[Architecture Guide](docs/architecture.md)**: Deep dive into the Provider/Manager system and internal logic.
+*   **[Roadmap](ROADMAP.md)**: Current project status and future plans.
+*   **[Testing](tests/README.md)**: Information about the test suite.
+
+## 🚀 Current Status
+
+As of February 2026, the project has successfully addressed **Priority 0 (Critical)** issues identified during the Jan 2026 audit:
+
+*   ✅ **Memory Safety**: Fixed kernel memory leaks in `ManualMapper`.
+*   ✅ **Provider Reliability**: Standardized `RTCore`, `Gdrv`, and `DBUtil` providers with authentic KDU implementation logic (syscalls, handle flags).
+*   ✅ **Execution Stability**: Resolved BSOD risks in persistence mechanisms and shellcode execution.
+*   ✅ **Build**: Successfully compiles for **Debug x64**.
 
 ## ✨ Features
 
@@ -34,62 +60,43 @@ KernelMode is a comprehensive proof-of-concept toolkit that demonstrates advance
 - **🔧 Vulnerable Driver Management**
   - Dynamic loading of vulnerable signed drivers
   - Automated service creation and management
-  - Provider-based architecture for extensibility
+  - Provider-based architecture (RTCore, Gdrv, DBUtil, etc.)
   - Support for multiple driver families
+
+- **🧨 Victim Driver Hijacking (New)**
+  - Loads a benign signed "Victim" driver (e.g. ProcExp, EchoDrv).
+  - Hijacks the Victim's dispatch routines to execute arbitrary kernel shellcode.
+  - Stealthy execution vector bypassing simple hooks.
 
 - **🛡️ Driver Signature Enforcement (DSE) Bypass**
   - Patches `g_CiOptions` kernel variable
   - Enables loading of unsigned drivers
-  - Persistent DSE state management
 
-- **🚀 Privilege Escalation**
-  - SYSTEM token stealing from kernel
-  - Interactive SYSTEM shell spawning
-  - Process token manipulation
-
-- **👻 Process Hiding (DKOM)**
-  - Unlinks processes from `ActiveProcessLinks`
-  - Removes entries from `PspCidTable`
-  - Invisible to both user-mode and kernel-mode enumeration
+- **🤖 Automated Rootkit Loader (SilentRK)**
+  - Dedicated `BYOVDManager` for end-to-end attack orchestration.
+  - Automated workflow: Load Vulnerable Driver -> Disable DSE -> Load Unsigned Payload (`SilentRK.sys`) -> Restore Security.
+  - Supports both Service-based loading and Manual Mapping techniques.
 
 - **🏗️ Manual Driver Mapping**
   - Bypass standard driver loading mechanisms
   - Import resolution and relocation handling
   - PE header obfuscation for stealth
 
-- **🛡️ AV/EDR Evasion**
-  - Kernel callback unlinking (Process/Thread/Image notifications)
-  - ETW Threat Intelligence Provider disabling
-  - Windows Defender service disruption
-  - Security product callback enumeration
-
-- **📁 File System Manipulation**
-  - File hiding via IRP hooking
-  - NTFS driver manipulation
-  - Directory enumeration filtering
-
-- **🔄 Persistence Mechanisms**
-  - Kernel-mode service creation via shellcode
-  - Registry manipulation for persistence
-  - Boot-time execution establishment
-
 - **🔍 Utilities**
   - PE file parser and analyzer
-  - Force driver uninstaller
   - Kernel memory utilities
 
-## 🏗️ Architecture
+## �️ Architecture
 
-The project follows a clean, modular architecture designed for extensibility and maintainability:
+The project uses a **Provider/Manager** model:
 
-### 🎨 Design Patterns
+1.  **Manager**: Handles the high-level attack lifecycle (load, exploit, unload).
+2.  **Providers**: Specialized implementations for each vulnerable driver (e.g., RTCore, GDRV).
+3.  **Resources**: Encrypted external drivers used for the attack.
 
-- **Provider Pattern**: Abstracts vulnerable driver implementations
-- **Factory Pattern**: Driver provider instantiation
-- **RAII**: Automatic resource management
-- **Modern C++14**: Smart pointers, move semantics, lambdas
+For a complete technical breakdown, see the **[Architecture Guide](docs/architecture.md)**.
 
-## 🎯 Supported Vulnerable Drivers
+## �🎯 Supported Vulnerable Drivers
 
 | Driver | Vendor | CVE | Technique | Status |
 |--------|--------|-----|-----------|--------|
@@ -97,18 +104,16 @@ The project follows a clean, modular architecture designed for extensibility and
 | `RTCore64.sys` | Micro-Star (MSI) | CVE-2019-16098 | Memory Read/Write | ✅ Active |
 | `DBUtil_2_3.sys` | Dell | CVE-2021-21551 | Memory Read/Write | ✅ Active |
 
-## 🛠️ Installation
+## 🛠️ Installation and Building
 
-### Prerequisites
+Please refer to the **[Build Instructions](docs/BUILD_INSTRUCTIONS.md)** for detailed steps on setting up Visual Studio 2022 and the Windows SDK.
 
-- **Visual Studio 2022** with C++ development tools
-- **Windows SDK 10.0.26100.0** or later
-- **MASM (ml64.exe)** for assembly compilation
-- **Administrator privileges** for execution
+1.  Clone the repository.
+2.  Open `KernelModeCpp.sln`.
+3.  Select **x64** and **Release**.
+4.  Build Solution.
 
-### Build Instructions
-
-1. **Clone the repository:**
+## 🚀 Usage
 git clone https://github.com/thebringerofdeath789/KernelModeCpp.git
 2. **Open in Visual Studio:**
 
@@ -134,23 +139,6 @@ The `asmSyscall.asm` file requires special configuration:
 ml64 /c /Fo"$(IntDir)" /Fe"$(IntDir)asmSyscall.obj" /I"$(SolutionDir)External\Includes" "$(ProjectDir)asmSyscall.asm"
 4. **Outputs:** $(IntDir)asmSyscall.obj
 
-## 🚀 Usage
-
-### Basic Workflow
-
-1. **Launch as Administrator:**
-
-2. **Select a Provider:**
-- Choose from available vulnerable drivers
-- The toolkit will automatically load and initialize the driver
-
-3. **Execute Operations:**
-- Navigate through the menu system
-- Select desired attack techniques
-- Monitor output for success/failure indicators
-
-
-## 🔬 Technical Details
 
 ### Direct System Calls
 
@@ -161,14 +149,6 @@ The toolkit implements direct system calls to avoid user-mode API hooks. The ass
 - RDX = parameters array  
 - R8 = parameter count
 - Uses direct syscall instruction to bypass hooks
-
-### Provider Architecture
-
-All vulnerable drivers implement the IProvider interface for consistent memory access:
-
-### Direct System Calls
-
-The toolkit implements direct system calls to avoid user-mode API hooks:
 
 ### DKOM Process Hiding
 
@@ -241,8 +221,6 @@ Drivers are manually mapped into kernel memory to bypass standard loading mechan
 **Key Features:**
 - RAII resource management
 - Smart pointer usage throughout
-- Modern C++14 features (move semantics, lambdas)
-- Modular provider-based design
 - Direct syscall implementation for stealth
 
 ## ⚖️ Legal Notice

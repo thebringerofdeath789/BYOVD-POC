@@ -19,7 +19,19 @@ namespace KernelMode {
     }
 
     Syscall::Syscall() {
-        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+        // BUG-015 FIX: Load fresh ntdll from disk to avoid user-mode hooks
+        // Hooks placed by AV/EDR in the in-memory ntdll often modify the syscall stubs.
+        // Reading from disk ensures we get the clean "golden" syscall numbers.
+        
+        char sysPath[MAX_PATH];
+        GetSystemDirectoryA(sysPath, MAX_PATH);
+        std::string ntdllPath = std::string(sysPath) + "\\ntdll.dll";
+        
+        HMODULE ntdll = LoadLibraryExA(ntdllPath.c_str(), NULL, DONT_RESOLVE_DLL_REFERENCES);
+        if (!ntdll) {
+             // Fallback to loaded module if disk read fails (unlikely)
+             ntdll = GetModuleHandleA("ntdll.dll");
+        }
         if (!ntdll) return;
 
         auto dosHeader = (PIMAGE_DOS_HEADER)ntdll;

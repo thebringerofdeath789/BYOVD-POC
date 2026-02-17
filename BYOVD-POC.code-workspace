@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../../Downloads/KDU/Source"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"string_view": "cpp",
+			"format": "cpp",
+			"initializer_list": "cpp",
+			"span": "cpp",
+			"iosfwd": "cpp"
+		}
+	}
+}

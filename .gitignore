@@ -361,3 +361,38 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Project specific ignores
+debug_output.txt
+BYOVD-POC_log.txt
+service_debug.txt
+gdrv_debug_custom.txt
+delete/
+*.sys
+*.aps
+*.log
+
+# Python
+__pycache__/
+*.pyc
+# NuGet
+packages/
+
+# Exclude IDE folders
+.vs/
+.vscode/
+
+# Exclude specific folders
+archive/
+tests/
+
+# Exclude all .txt files
+*.txt
+
+# Exclude all .md files except README.md and docs/
+*.md
+!README.md
+!docs/**/*.md
+
+# User requests
+Source/.vs/
+

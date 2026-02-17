@@ -4,32 +4,43 @@
  * @date August 13, 2025
  * @brief This file contains the declaration of the PocMenu class.
  *
- * The PocMenu class provides the main user interface for the KernelMode
- * toolkit. It presents a menu-driven console interface for selecting
- * providers and executing various kernel-level operations.
+ * The PocMenu class manages the console interface for the kernel toolkit,
+ * including provider selection, action execution, and utility access. Updated
+ * to support KDU-style driver management.
  */
 
 #pragma once
 
-#include "Providers/IProvider.h"
 #include "DSE.h"
-#include "Process.h"
-#include "Callbacks.h"
 #include "ManualMapper.h"
-#include "FileHider.h"
-#include "ETW.h"
-#include <memory>
-#include <vector>
-#include <string>
+#include "Providers/IProvider.h"
+#include "ProviderSystem.h"
+#include "ServiceManager.h"
+#include <fstream>
+
+// Global log file declaration
+extern std::ofstream g_logFile;
+
+// Logging helper macro - outputs to both console and log file
+#define LOG_OUTPUT(msg) do { \
+    std::cout << msg; \
+    if (g_logFile.is_open()) { \
+        g_logFile << msg; \
+        g_logFile.flush(); \
+    } \
+} while(0)
+#include "Resources/DriverDataManager.h"
+#include "Victim.h"
+#include <memory> 
 
 namespace KernelMode {
     /**
      * @class PocMenu
-     * @brief The main user interface for the toolkit.
+     * @brief Manages the console user interface for the toolkit.
      *
-     * This class manages the application's main loop, displaying menus,
-     * handling user input, and orchestrating the calls to the various
-     * feature implementations like DSE bypass and privilege escalation.
+     * This class provides a menu-driven interface for users to select
+     * providers, execute various kernel-level operations, and access utilities.
+     * Updated to support KDU-style driver management with automatic driver selection.
      */
     class PocMenu {
     public:
@@ -37,84 +48,144 @@ namespace KernelMode {
         ~PocMenu();
 
         /**
-         * @brief Starts the main menu loop of the application.
+         * @brief Starts the main menu loop.
          */
         void Run();
 
     private:
         /**
-         * @brief Displays the main title banner.
+         * @brief Displays the application banner.
          */
         void DisplayBanner();
 
         /**
-         * @brief Displays the provider selection menu and handles user choice.
+         * @brief Gets user input and validates the choice.
+         * @param maxChoice The maximum valid choice.
+         * @return The user's choice, or -1 if invalid.
+         */
+        int GetUserChoice(int maxChoice);
+
+        /**
+         * @brief Handles provider selection with KDU-style driver management.
          */
         void SelectProvider();
 
         /**
-         * @brief Displays the main actions menu for the selected provider.
+         * @brief Displays and handles the provider actions menu.
          */
         void ProviderActionsMenu();
 
         /**
-         * @brief Handles the DSE bypass option.
+         * @brief Handles DSE bypass operations.
          */
         void HandleDseBypass();
 
         /**
-         * @brief Handles the privilege escalation options.
-         */
-        void HandlePrivilegeEscalation();
-
-        /**
-         * @brief Handles the process hiding options.
-         */
-        void HandleProcessHiding();
-
-        /**
-         * @brief Handles the AV/EDR Evasion options, such as callback unlinking.
-         */
-        void HandleAvEvasion();
-
-        /**
-         * @brief Handles the PE Parser utility.
-         */
-        void HandlePeParser();
-
-        /**
-         * @brief Handles the Driver Manual Mapping utility.
+         * @brief Handles manual driver mapping operations.
          */
         void HandleManualMap();
 
         /**
-         * @brief Handles the Persistence utility.
+         * @brief Handles PE parser utility.
          */
-        void HandlePersistence();
+        void HandlePeParser();
 
         /**
-         * @brief Handles the Force Uninstaller utility.
+         * @brief Auto-loads the SilentRK driver using BYOVD techniques.
          */
-        void HandleUninstaller();
+        void HandleAutoLoadSilentRK();
 
         /**
-         * @brief Handles the File Hiding utility.
+         * @brief Handles loading a victim driver for safe execution.
          */
-        void HandleFileHiding();
+        void HandleLoadVictim();
 
         /**
-         * @brief Gets a validated integer choice from the user.
-         * @param maxChoice The maximum valid choice number.
-         * @return The user's choice, or -1 on failure.
+         * @brief Attempts to find and use system-installed vulnerable drivers.
+         * @return True if a compatible driver is found and loaded, false otherwise.
          */
-        int GetUserChoice(int maxChoice);
+        bool FindSystemVulnerableDrivers();
 
+        /**
+         * @brief Attempts direct DSE bypass using memory techniques.
+         * @return True if DSE bypass successful, false otherwise.
+         */
+        bool AttemptDirectDSEBypass();
+
+        /**
+         * @brief Attempts service-based driver loading.
+         * @param driverPath Path to the driver to load.
+         * @return True if loading successful, false otherwise.
+         */
+        bool AttemptServiceBasedLoading(const std::wstring& driverPath);
+
+        /**
+         * @brief Attempts physical memory injection of driver.
+         * @param driverPath Path to the driver to inject.
+         * @return True if injection successful, false otherwise.
+         */
+        bool AttemptPhysicalMemoryInjection(const std::wstring& driverPath);
+
+        /**
+         * @brief Attempts KDU-style physical memory mapping technique.
+         * @return True if successful, false otherwise.
+         */
+        bool AttemptPhysicalMemoryMapping();
+
+        /**
+         * @brief Attempts KDU-style virtual memory mapping technique.
+         * @return True if successful, false otherwise.
+         */
+        bool AttemptVirtualMemoryMapping();
+
+        /**
+         * @brief Executes shellcode using specified technique (V1-V4).
+         * @param shellcodeVersion Version of KDU shellcode to use (1-4).
+         * @return True if shellcode execution successful, false otherwise.
+         */
+        bool ExecuteKDUShellcode(int shellcodeVersion);
+
+        /**
+         * @brief Attempts provider-based driver mapping using loaded vulnerable driver.
+         * @param driverPath Path to the driver to map.
+         * @param context Provider context with loaded vulnerable driver.
+         * @return True if mapping successful, false otherwise.
+         */
+        bool AttemptProviderBasedMapping(const std::wstring& driverPath, PPROVIDER_CONTEXT context);
+
+        /**
+         * @brief Applies stealth techniques using provider capabilities.
+         * @param context Provider context with active provider.
+         */
+        void ApplyStealthTechniques(PPROVIDER_CONTEXT context);
+
+        /**
+         * @brief Extracts and loads a vulnerable driver using KDU-style extraction.
+         * @return True if extraction and loading successful, false otherwise.
+         */
+        bool ExtractAndLoadVulnerableDriver();
+
+        /**
+         * @brief Extracts a .bin file to a .sys file (signed driver extraction).
+         * @param binPath Path to the .bin file containing the signed driver.
+         * @param sysPath Path where the .sys file should be created.
+         * @return True if extraction successful, false otherwise.
+         */
+        bool ExtractBinToSys(const std::wstring& binPath, const std::wstring& sysPath);
+
+        /**
+         * @brief Loads a signed driver via Windows service manager.
+         * @param sysPath Path to the extracted .sys driver file.
+         * @param serviceName Name of the service to create for the driver.
+         * @return True if driver loaded successfully, false otherwise.
+         */
+        bool LoadSignedDriver(const std::wstring& sysPath, const std::wstring& serviceName);
+
+        // Core components
+        std::unique_ptr<ServiceManager> serviceManager;
         std::shared_ptr<Providers::IProvider> activeProvider;
         std::unique_ptr<DSE> dseManager;
-        std::unique_ptr<Process> processManager;
-        std::unique_ptr<Callbacks> callbackManager;
         std::unique_ptr<ManualMapper> manualMapper;
-        std::unique_ptr<FileHider> fileHider;
-        std::unique_ptr<ETW> etwManager;
+        std::shared_ptr<Victim> victim;
     };
 }
